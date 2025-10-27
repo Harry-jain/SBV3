@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: collaborative-ide-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-collaborative_ide}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    container_name: collaborative-ide-auth
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-collaborative_ide}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      JWT_EXPIRY: ${JWT_EXPIRY:-24h}
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./services/auth:/app
+      - /app/node_modules
+
+  redis:
+    image: redis:7-alpine
+    container_name: collaborative-ide-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: collaborative-ide-gateway
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      GATEWAY_PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      REALTIME_SERVICE_URL: http://realtime-service:3002
+      IDE_SERVICE_URL: http://ide-service:3003
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+    volumes:
+      - ./services/gateway:/app
+      - /app/node_modules
+
+  realtime-service:
+    build:
+      context: ./services/realtime
+      dockerfile: Dockerfile
+    container_name: collaborative-ide-realtime
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3002
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3002:3002"
+    depends_on:
+      - redis
+    volumes:
+      - ./services/realtime:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:

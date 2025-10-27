@@ -1,0 +1,20 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "env": [
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "description": "Your Supabase project URL"
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "description": "Your Supabase anonymous key"
+    },
+    {
+      "key": "NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL",
+      "description": "Redirect URL for Supabase auth (set to your Vercel domain in production)"
+    }
+  ]
+}

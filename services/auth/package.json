@@ -1,0 +1,22 @@
+{
+  "name": "auth-service",
+  "version": "1.0.0",
+  "description": "Authentication service for collaborative IDE",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "pg": "^8.16.3",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.3",
+    "axios": "^1.13.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

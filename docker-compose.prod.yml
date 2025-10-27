@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: collaborative-ide-db-prod
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    container_name: collaborative-ide-auth-prod
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRY: ${JWT_EXPIRY}
+      PORT: 3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: collaborative-ide-redis-prod
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: collaborative-ide-gateway-prod
+    environment:
+      NODE_ENV: production
+      GATEWAY_PORT: 3000
+      AUTH_SERVICE_URL: http://auth-service:3001
+      REALTIME_SERVICE_URL: http://realtime-service:3002
+      IDE_SERVICE_URL: http://ide-service:3003
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+    restart: unless-stopped
+
+  realtime-service:
+    build:
+      context: ./services/realtime
+      dockerfile: Dockerfile
+    container_name: collaborative-ide-realtime-prod
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      JWT_SECRET: ${JWT_SECRET}
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: collaborative-ide-web-prod
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
